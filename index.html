@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPDB Online</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
+  :root {
+    --navy:#0f1f3d;--gold:#e8b84b;--gold-light:#f5d07a;--cream:#faf7f2;
+    --white:#ffffff;--gray:#6b7280;--gray-light:#f3f4f6;--red:#ef4444;
+    --green:#22c55e;--border:#e5e7eb;--text:#1f2937;--shadow:0 4px 24px rgba(15,31,61,0.10);
+    --sb:#3ecf8e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--cream);color:var(--text);min-height:100vh;}
+
+  #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--navy) 0%,#1e3a6e 60%,#0a3d25 100%);position:relative;overflow:hidden;}
+  #login-screen::before{content:'';position:absolute;top:-80px;right:-80px;width:340px;height:340px;border-radius:50%;background:rgba(62,207,142,0.1);}
+  #login-screen::after{content:'';position:absolute;bottom:-60px;left:-60px;width:260px;height:260px;border-radius:50%;background:rgba(62,207,142,0.07);}
+  .login-card{background:white;border-radius:24px;padding:52px 44px 44px;width:100%;max-width:420px;
+    box-shadow:0 24px 64px rgba(0,0,0,0.22);position:relative;z-index:1;animation:slideUp 0.5s ease;}
+  @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+  .login-logo{width:64px;height:64px;background:linear-gradient(135deg,var(--navy),#0a3d25);border-radius:16px;
+    display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px;}
+  .login-title{font-family:'Instrument Serif',serif;font-size:26px;font-weight:400;color:var(--navy);text-align:center;margin-bottom:4px;}
+  .login-sub{text-align:center;color:var(--gray);font-size:13.5px;margin-bottom:32px;}
+  .login-hint{text-align:center;margin-top:18px;color:var(--gray);font-size:12.5px;}
+  .login-hint span{color:var(--navy);font-weight:600;}
+
+  .form-group{margin-bottom:14px;}
+  .form-group label{display:block;font-size:12.5px;font-weight:600;color:var(--navy);margin-bottom:6px;}
+  .form-group label .req{color:var(--red);}
+  .form-group input,.form-group select,.form-group textarea{
+    width:100%;padding:10px 13px;border:1.5px solid var(--border);border-radius:9px;
+    font-family:inherit;font-size:13.5px;color:var(--text);background:var(--gray-light);
+    transition:border-color 0.2s,background 0.2s;outline:none;}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--navy);background:white;}
+  .form-group select:disabled{opacity:0.5;cursor:not-allowed;}
+  .form-group textarea{resize:vertical;min-height:64px;}
+  .btn-primary{width:100%;padding:13px;background:linear-gradient(135deg,var(--navy),#0a5c36);
+    color:white;border:none;border-radius:11px;font-family:inherit;font-size:15px;font-weight:700;
+    cursor:pointer;transition:transform 0.15s,box-shadow 0.15s;}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(15,31,61,0.25);}
+
+  #app{display:none;min-height:100vh;flex-direction:column;}
+  .topbar{background:var(--navy);color:white;padding:0 32px;height:64px;display:flex;
+    align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;
+    box-shadow:0 2px 16px rgba(0,0,0,0.18);}
+  .topbar-left{display:flex;align-items:center;gap:12px;}
+  .topbar-icon{font-size:22px;}
+  .topbar-title{font-family:'Instrument Serif',serif;font-size:20px;}
+  .topbar-sub{font-size:11px;color:rgba(255,255,255,0.55);margin-top:1px;}
+  .topbar-right{display:flex;align-items:center;gap:14px;}
+  .badge-admin{background:rgba(232,184,75,0.18);color:var(--gold-light);border:1px solid rgba(232,184,75,0.35);border-radius:20px;padding:4px 13px;font-size:12px;font-weight:600;}
+  .badge-sb{background:rgba(62,207,142,0.12);color:var(--sb);border:1px solid rgba(62,207,142,0.25);border-radius:20px;padding:4px 13px;font-size:12px;font-weight:600;}
+  .btn-logout{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:white;border-radius:8px;padding:7px 14px;font-family:inherit;font-size:13px;cursor:pointer;transition:background 0.2s;}
+  .btn-logout:hover{background:rgba(255,255,255,0.18);}
+
+  .main-content{flex:1;padding:28px 32px;max-width:1200px;margin:0 auto;width:100%;}
+  .tabs{display:flex;gap:4px;margin-bottom:24px;background:white;border-radius:12px;padding:5px;box-shadow:var(--shadow);}
+  .tab-btn{flex:1;padding:10px 16px;border:none;border-radius:9px;font-family:inherit;font-size:13.5px;font-weight:600;cursor:pointer;color:var(--gray);background:transparent;transition:all 0.2s;}
+  .tab-btn.active{background:var(--navy);color:white;box-shadow:0 2px 10px rgba(15,31,61,0.2);}
+  .tab-btn:hover:not(.active){background:var(--gray-light);color:var(--navy);}
+
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px;}
+  .stat-card{background:white;border-radius:14px;padding:18px 16px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;}
+  .stat-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+  .stat-icon.blue{background:#eff6ff;}.stat-icon.gold{background:#fefce8;}.stat-icon.green{background:#f0fdf4;}.stat-icon.red{background:#fef2f2;}
+  .stat-label{font-size:11.5px;color:var(--gray);font-weight:500;}
+  .stat-num{font-size:24px;font-weight:800;color:var(--navy);line-height:1;margin-top:2px;}
+
+  .section-card{background:white;border-radius:18px;padding:24px 28px;box-shadow:var(--shadow);margin-bottom:22px;}
+  .section-title{font-family:'Instrument Serif',serif;font-size:19px;color:var(--navy);}
+  .section-sub{font-size:12px;color:var(--gray);margin-top:2px;}
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+
+  .fieldset{border:1.5px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:20px;}
+  .fieldset-legend{font-size:13px;font-weight:700;color:var(--navy);background:white;padding:2px 10px;margin-left:-4px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-grid .full{grid-column:1/-1;}
+
+  .btn-submit{background:linear-gradient(135deg,var(--navy),#0a5c36);color:white;border:none;border-radius:11px;
+    padding:12px 32px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;
+    transition:transform 0.15s,box-shadow 0.15s;margin-top:6px;}
+  .btn-submit:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(15,31,61,0.2);}
+  .btn-submit:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+
+  .table-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .search-box{flex:1;min-width:180px;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;
+    font-family:inherit;font-size:13.5px;background:var(--gray-light);outline:none;}
+  .search-box:focus{border-color:var(--navy);background:white;}
+  .btn-export{background:linear-gradient(135deg,#16a34a,#15803d);color:white;border:none;border-radius:10px;
+    padding:10px 18px;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;
+    transition:transform 0.15s;display:flex;align-items:center;gap:6px;white-space:nowrap;}
+  .btn-export:hover{transform:translateY(-1px);}
+  .table-wrap{overflow-x:auto;margin-top:16px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead tr{background:var(--navy);color:white;}
+  thead th{padding:11px 13px;text-align:left;font-weight:600;font-size:12px;white-space:nowrap;}
+  thead th:first-child{border-radius:9px 0 0 9px;}thead th:last-child{border-radius:0 9px 9px 0;}
+  tbody tr{border-bottom:1px solid var(--border);transition:background 0.15s;}
+  tbody tr:hover{background:#f0f4ff;}
+  tbody td{padding:10px 13px;white-space:nowrap;}
+  .no-data{text-align:center;color:var(--gray);padding:36px;font-size:14px;}
+  .btn-hapus{background:#fee2e2;color:var(--red);border:none;border-radius:7px;padding:4px 11px;
+    font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;}
+  .btn-hapus:hover{background:#fca5a5;}
+  .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+  .badge-lk{background:#dbeafe;color:#1d4ed8;}.badge-pr{background:#fce7f3;color:#be185d;}
+
+  .loading-overlay{position:fixed;inset:0;background:rgba(15,31,61,0.55);z-index:9998;display:none;align-items:center;justify-content:center;}
+  .loading-box{background:white;border-radius:16px;padding:28px 36px;text-align:center;}
+  .spinner{width:36px;height:36px;border:3px solid #e5e7eb;border-top-color:var(--sb);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 14px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-box p{color:var(--navy);font-weight:600;font-size:14px;}
+
+  #toast{position:fixed;bottom:24px;right:24px;z-index:9999;background:var(--navy);color:white;
+    padding:13px 20px;border-radius:12px;font-size:13.5px;font-weight:600;
+    box-shadow:0 8px 24px rgba(0,0,0,0.2);transform:translateY(80px);opacity:0;
+    transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);}
+  #toast.show{transform:translateY(0);opacity:1;}
+  #toast.success{border-left:4px solid var(--sb);}
+  #toast.error{border-left:4px solid var(--red);}
+
+  @media(max-width:768px){
+    .stats-row{grid-template-columns:1fr 1fr;}
+    .form-grid{grid-template-columns:1fr;}
+    .form-grid .full{grid-column:1;}
+    .main-content{padding:16px;}
+    .topbar{padding:0 16px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loading-overlay" style="display:none;">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <p id="loading-text">Memproses...</p>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">🏫</div>
+    <div class="login-title">PPDB Online</div>
+    <div class="login-sub">Sistem Penerimaan Peserta Didik Baru</div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="Masukkan username" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="Masukkan password" onkeydown="if(event.key==='Enter')doLogin()" />
+    </div>
+    <button class="btn-primary" onclick="doLogin()">Masuk →</button>
+    <div class="login-hint">Demo: username <span>admin</span> / password <span>admin123</span></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none;flex-direction:column;">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-icon">🏫</div>
+      <div>
+        <div class="topbar-title">PPDB Online</div>
+        <div class="topbar-sub">Penerimaan Peserta Didik Baru</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="badge-sb" id="sb-status">⚡ Menghubungkan...</div>
+      <div class="badge-admin">👤 Admin</div>
+      <button class="btn-logout" onclick="doLogout()">Keluar</button>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-icon blue">📋</div><div><div class="stat-label">Total Pendaftar</div><div class="stat-num" id="stat-total">-</div></div></div>
+      <div class="stat-card"><div class="stat-icon gold">🧑</div><div><div class="stat-label">Laki-laki</div><div class="stat-num" id="stat-lk">-</div></div></div>
+      <div class="stat-card"><div class="stat-icon red">👧</div><div><div class="stat-label">Perempuan</div><div class="stat-num" id="stat-pr">-</div></div></div>
+      <div class="stat-card"><div class="stat-icon green">📅</div><div><div class="stat-label">Hari Ini</div><div class="stat-num" id="stat-today">-</div></div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('daftar',this)">✏️ Form Pendaftaran</button>
+      <button class="tab-btn" onclick="switchTab('data',this)">📊 Data Peserta</button>
+    </div>
+
+    <!-- TAB DAFTAR -->
+    <div id="tab-daftar">
+      <div class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Form Pendaftaran Peserta Didik Baru</div>
+            <div class="section-sub">Isi semua data yang bertanda <span style="color:var(--red)">*</span> dengan lengkap dan benar</div>
+          </div>
+        </div>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">👤 1. Identitas Peserta Didik</legend>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Nama Siswa <span class="req">*</span></label>
+              <input type="text" id="f-nama" placeholder="Nama lengkap sesuai akta kelahiran" />
+            </div>
+            <div class="form-group">
+              <label>Jenis Kelamin <span class="req">*</span></label>
+              <select id="f-jk"><option value="">-- Pilih --</option><option>Laki-laki</option><option>Perempuan</option></select>
+            </div>
+            <div class="form-group">
+              <label>NIK <span class="req">*</span></label>
+              <input type="text" id="f-nik" placeholder="16 digit NIK" maxlength="16" />
+            </div>
+            <div class="form-group">
+              <label>Tempat Lahir <span class="req">*</span></label>
+              <input type="text" id="f-ttl-t" placeholder="Kota/Kabupaten tempat lahir" />
+            </div>
+            <div class="form-group">
+              <label>Tanggal Lahir <span class="req">*</span></label>
+              <input type="date" id="f-ttl-d" />
+            </div>
+            <div class="form-group">
+              <label>Agama <span class="req">*</span></label>
+              <select id="f-agama">
+                <option value="">-- Pilih Agama --</option>
+                <option>Islam</option><option>Kristen Protestan</option><option>Kristen Katolik</option>
+                <option>Hindu</option><option>Budha</option><option>Konghucu</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Jumlah Saudara</label>
+              <input type="number" id="f-saudara" placeholder="Jumlah saudara kandung" min="0" max="20" />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">👨‍👩‍👧 2. Identitas Orang Tua</legend>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nama Ayah <span class="req">*</span></label>
+              <input type="text" id="f-ayah" placeholder="Nama lengkap ayah" />
+            </div>
+            <div class="form-group">
+              <label>Pekerjaan Ayah</label>
+              <select id="f-kerja-ayah">
+                <option value="">-- Pilih --</option>
+                <option>PNS/ASN</option><option>TNI/Polri</option><option>Pegawai Swasta</option>
+                <option>Wiraswasta/Pengusaha</option><option>Petani/Nelayan</option>
+                <option>Buruh</option><option>Pensiunan</option><option>Tidak Bekerja</option><option>Lainnya</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Pendidikan Ayah</label>
+              <select id="f-didik-ayah">
+                <option value="">-- Pilih --</option>
+                <option>Tidak Sekolah</option><option>SD/Sederajat</option><option>SMP/Sederajat</option>
+                <option>SMA/SMK/Sederajat</option><option>D1/D2/D3</option><option>S1/D4</option><option>S2</option><option>S3</option>
+              </select>
+            </div>
+            <div class="form-group" style="visibility:hidden"></div>
+            <div class="form-group">
+              <label>Nama Ibu <span class="req">*</span></label>
+              <input type="text" id="f-ibu" placeholder="Nama lengkap ibu" />
+            </div>
+            <div class="form-group">
+              <label>Pekerjaan Ibu</label>
+              <select id="f-kerja-ibu">
+                <option value="">-- Pilih --</option>
+                <option>PNS/ASN</option><option>TNI/Polri</option><option>Pegawai Swasta</option>
+                <option>Wiraswasta/Pengusaha</option><option>Petani/Nelayan</option>
+                <option>Buruh</option><option>Ibu Rumah Tangga</option><option>Pensiunan</option>
+                <option>Tidak Bekerja</option><option>Lainnya</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Pendidikan Ibu</label>
+              <select id="f-didik-ibu">
+                <option value="">-- Pilih --</option>
+                <option>Tidak Sekolah</option><option>SD/Sederajat</option><option>SMP/Sederajat</option>
+                <option>SMA/SMK/Sederajat</option><option>D1/D2/D3</option><option>S1/D4</option><option>S2</option><option>S3</option>
+              </select>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">🏠 3. Alamat Rumah</legend>
+          <div class="form-grid">
+            <div class="form-group full">
+              <label>Alamat <span class="req">*</span></label>
+              <textarea id="f-alamat" placeholder="Jalan, No. Rumah, RT/RW"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Provinsi <span class="req">*</span></label>
+              <select id="f-provinsi" onchange="loadKabupaten()"><option value="">-- Pilih Provinsi --</option></select>
+            </div>
+            <div class="form-group">
+              <label>Kota / Kabupaten <span class="req">*</span></label>
+              <select id="f-kabupaten" onchange="loadKecamatan()" disabled><option value="">-- Pilih Kab/Kota --</option></select>
+            </div>
+            <div class="form-group">
+              <label>Kecamatan <span class="req">*</span></label>
+              <select id="f-kecamatan" onchange="loadKelurahan()" disabled><option value="">-- Pilih Kecamatan --</option></select>
+            </div>
+            <div class="form-group">
+              <label>Kelurahan / Desa <span class="req">*</span></label>
+              <select id="f-kelurahan" disabled><option value="">-- Pilih Kelurahan --</option></select>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset">
+          <legend class="fieldset-legend">🏫 4. Asal Sekolah</legend>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nama Sekolah Asal <span class="req">*</span></label>
+              <input type="text" id="f-asal" placeholder="Nama lengkap sekolah asal" />
+            </div>
+            <div class="form-group">
+              <label>Alamat Sekolah Asal</label>
+              <input type="text" id="f-asal-alamat" placeholder="Alamat sekolah asal" />
+            </div>
+          </div>
+        </fieldset>
+
+        <button class="btn-submit" id="btn-simpan" onclick="submitForm()">💾 Simpan Pendaftaran</button>
+      </div>
+    </div>
+
+    <!-- TAB DATA -->
+    <div id="tab-data" style="display:none;">
+      <div class="section-card">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Data Peserta Didik Baru</div>
+            <div class="section-sub">Data real-time dari Supabase — sinkron semua perangkat</div>
+          </div>
+        </div>
+        <div class="table-toolbar">
+          <input class="search-box" type="text" id="search-input" placeholder="🔍  Cari nama, sekolah asal..." oninput="renderTable()" />
+          <select id="filter-jk" onchange="renderTable()" style="padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-family:inherit;font-size:13px;background:var(--gray-light);outline:none;">
+            <option value="">Semua JK</option><option>Laki-laki</option><option>Perempuan</option>
+          </select>
+          <button class="btn-export" onclick="exportExcel()">📥 Export Excel</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>No. Daftar</th><th>Nama Siswa</th><th>JK</th><th>NIK</th>
+                <th>TTL</th><th>Agama</th><th>Jml Saudara</th>
+                <th>Nama Ayah</th><th>Pkj Ayah</th><th>Pend. Ayah</th>
+                <th>Nama Ibu</th><th>Pkj Ibu</th><th>Pend. Ibu</th>
+                <th>Alamat</th><th>Kelurahan</th><th>Kecamatan</th><th>Kab/Kota</th><th>Provinsi</th>
+                <th>Asal Sekolah</th><th>Alamat Sekolah</th><th>Tgl Daftar</th><th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"><tr><td colspan="23" class="no-data">⏳ Memuat data dari Supabase...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ============================================================
+// 🔧 GANTI DENGAN CREDENTIALS SUPABASE-MU
+// Cara dapat: Supabase Dashboard → Project Settings → API
+// ============================================================
+const SUPABASE_URL = 'GANTI_PROJECT_URL';   // contoh: https://xxxx.supabase.co
+const SUPABASE_KEY = 'GANTI_ANON_KEY';      // anon public key
+
+// Init Supabase
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ===== STATE =====
+let peserta = [];
+let realtimeChannel = null;
+
+// ===== AUTH =====
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  if (u === 'admin' && p === 'admin123') {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    loadProvinsi();
+    fetchData();
+    subscribeRealtime();
+    showToast('✅ Selamat datang, Admin!', 'success');
+  } else {
+    showToast('❌ Username atau password salah!', 'error');
+  }
+}
+
+function doLogout() {
+  if (realtimeChannel) sb.removeChannel(realtimeChannel);
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  peserta = [];
+}
+
+// ===== FETCH DATA =====
+async function fetchData() {
+  try {
+    const { data, error } = await sb
+      .from('peserta')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    peserta = data || [];
+    updateStats();
+    renderTable();
+    setSbStatus(true);
+  } catch(e) {
+    setSbStatus(false);
+    showToast('⚠️ Gagal memuat data: ' + e.message, 'error');
+  }
+}
+
+// ===== REALTIME SUBSCRIPTION =====
+function subscribeRealtime() {
+  realtimeChannel = sb
+    .channel('peserta-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'peserta' }, () => {
+      fetchData(); // Refresh data saat ada perubahan
+    })
+    .subscribe((status) => {
+      setSbStatus(status === 'SUBSCRIBED');
+    });
+}
+
+function setSbStatus(online) {
+  const el = document.getElementById('sb-status');
+  el.textContent = online ? '⚡ Supabase Connected' : '🔴 Offline';
+  el.style.color = online ? 'var(--sb)' : '#f85149';
+}
+
+// ===== TABS =====
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-daftar').style.display = name === 'daftar' ? 'block' : 'none';
+  document.getElementById('tab-data').style.display = name === 'data' ? 'block' : 'none';
+}
+
+// ===== WILAYAH API =====
+const API = 'https://www.emsifa.com/api-wilayah-indonesia/api';
+
+async function loadProvinsi() {
+  try {
+    const res = await fetch(`${API}/provinces.json`);
+    const data = await res.json();
+    const sel = document.getElementById('f-provinsi');
+    sel.innerHTML = '<option value="">-- Pilih Provinsi --</option>';
+    data.forEach(p => { sel.innerHTML += `<option value="${p.id}" data-nama="${p.name}">${p.name}</option>`; });
+  } catch(e) {}
+}
+async function loadKabupaten() {
+  const id = document.getElementById('f-provinsi').value;
+  const kab=document.getElementById('f-kabupaten'), kec=document.getElementById('f-kecamatan'), kel=document.getElementById('f-kelurahan');
+  kab.innerHTML='<option value="">-- Pilih Kab/Kota --</option>';
+  kec.innerHTML='<option value="">-- Pilih Kecamatan --</option>';
+  kel.innerHTML='<option value="">-- Pilih Kelurahan --</option>';
+  kab.disabled=true; kec.disabled=true; kel.disabled=true;
+  if (!id) return;
+  kab.innerHTML='<option>⏳ Memuat...</option>'; kab.disabled=false;
+  const data = await (await fetch(`${API}/regencies/${id}.json`)).json();
+  kab.innerHTML='<option value="">-- Pilih Kab/Kota --</option>';
+  data.forEach(k => { kab.innerHTML += `<option value="${k.id}" data-nama="${k.name}">${k.name}</option>`; });
+}
+async function loadKecamatan() {
+  const id = document.getElementById('f-kabupaten').value;
+  const kec=document.getElementById('f-kecamatan'), kel=document.getElementById('f-kelurahan');
+  kec.innerHTML='<option value="">-- Pilih Kecamatan --</option>';
+  kel.innerHTML='<option value="">-- Pilih Kelurahan --</option>';
+  kec.disabled=true; kel.disabled=true;
+  if (!id) return;
+  kec.innerHTML='<option>⏳ Memuat...</option>'; kec.disabled=false;
+  const data = await (await fetch(`${API}/districts/${id}.json`)).json();
+  kec.innerHTML='<option value="">-- Pilih Kecamatan --</option>';
+  data.forEach(k => { kec.innerHTML += `<option value="${k.id}" data-nama="${k.name}">${k.name}</option>`; });
+}
+async function loadKelurahan() {
+  const id = document.getElementById('f-kecamatan').value;
+  const kel=document.getElementById('f-kelurahan');
+  kel.innerHTML='<option value="">-- Pilih Kelurahan --</option>'; kel.disabled=true;
+  if (!id) return;
+  kel.innerHTML='<option>⏳ Memuat...</option>'; kel.disabled=false;
+  const data = await (await fetch(`${API}/villages/${id}.json`)).json();
+  kel.innerHTML='<option value="">-- Pilih Kelurahan --</option>';
+  data.forEach(k => { kel.innerHTML += `<option value="${k.id}" data-nama="${k.name}">${k.name}</option>`; });
+}
+function getSelText(id) {
+  const el = document.getElementById(id);
+  if (!el || !el.value) return '';
+  const opt = el.options[el.selectedIndex];
+  return opt ? (opt.getAttribute('data-nama') || opt.text) : '';
+}
+
+// ===== SUBMIT KE SUPABASE =====
+async function submitForm() {
+  const g = id => document.getElementById(id).value.trim();
+  const nama=g('f-nama'),jk=g('f-jk'),nik=g('f-nik'),ttlt=g('f-ttl-t'),
+        ttld=g('f-ttl-d'),agama=g('f-agama'),ayah=g('f-ayah'),ibu=g('f-ibu'),
+        alamat=g('f-alamat'),provinsi=getSelText('f-provinsi'),kabupaten=getSelText('f-kabupaten'),
+        kecamatan=getSelText('f-kecamatan'),kelurahan=getSelText('f-kelurahan'),asal=g('f-asal');
+
+  if (!nama||!jk||!nik||!ttlt||!ttld||!agama||!ayah||!ibu||!alamat||!provinsi||!kabupaten||!kecamatan||!kelurahan||!asal) {
+    showToast('⚠️ Lengkapi semua field wajib (*)', 'error'); return;
+  }
+
+  const btn = document.getElementById('btn-simpan');
+  btn.disabled = true;
+  showLoading('Menyimpan ke Supabase...');
+
+  try {
+    const no_daftar = 'PPDB-' + Date.now().toString().slice(-7);
+    const { error } = await sb.from('peserta').insert([{
+      no_daftar, nama, jk, nik,
+      tempat_lahir: ttlt,
+      tanggal_lahir: ttld,
+      agama, saudara: g('f-saudara') || '0',
+      ayah, kerja_ayah: g('f-kerja-ayah'), didik_ayah: g('f-didik-ayah'),
+      ibu, kerja_ibu: g('f-kerja-ibu'), didik_ibu: g('f-didik-ibu'),
+      alamat, kelurahan, kecamatan, kabupaten, provinsi,
+      asal, asal_alamat: g('f-asal-alamat'),
+      tgl_daftar: new Date().toLocaleDateString('id-ID')
+    }]);
+
+    if (error) throw error;
+
+    ['f-nama','f-jk','f-nik','f-ttl-t','f-ttl-d','f-agama','f-saudara',
+     'f-ayah','f-kerja-ayah','f-didik-ayah','f-ibu','f-kerja-ibu','f-didik-ibu',
+     'f-alamat','f-asal','f-asal-alamat'].forEach(id => { document.getElementById(id).value=''; });
+    document.getElementById('f-provinsi').value='';
+    ['f-kabupaten','f-kecamatan','f-kelurahan'].forEach(id => {
+      document.getElementById(id).innerHTML='<option value="">--</option>';
+      document.getElementById(id).disabled=true;
+    });
+
+    hideLoading();
+    showToast('✅ Data tersimpan! No: ' + no_daftar, 'success');
+  } catch(e) {
+    hideLoading();
+    showToast('❌ Gagal simpan: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ===== HAPUS =====
+async function hapus(id) {
+  if (!confirm('Yakin hapus data ini?')) return;
+  showLoading('Menghapus data...');
+  const { error } = await sb.from('peserta').delete().eq('id', id);
+  hideLoading();
+  if (error) { showToast('❌ Gagal hapus: ' + error.message, 'error'); return; }
+  showToast('🗑 Data berhasil dihapus', 'success');
+}
+
+// ===== TABLE =====
+function renderTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const fJk = document.getElementById('filter-jk').value;
+  const tbody = document.getElementById('table-body');
+  const filtered = peserta.filter(p =>
+    (!q || p.nama.toLowerCase().includes(q) || (p.asal||'').toLowerCase().includes(q) || (p.no_daftar||'').toLowerCase().includes(q)) &&
+    (!fJk || p.jk === fJk)
+  );
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="23" class="no-data">📭 Belum ada data pendaftar</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map((p,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td><b>${p.no_daftar||'-'}</b></td>
+      <td>${p.nama}</td>
+      <td><span class="badge ${p.jk==='Laki-laki'?'badge-lk':'badge-pr'}">${p.jk}</span></td>
+      <td>${p.nik||'-'}</td>
+      <td>${p.tempat_lahir||''}, ${p.tanggal_lahir ? new Date(p.tanggal_lahir).toLocaleDateString('id-ID') : ''}</td>
+      <td>${p.agama||'-'}</td>
+      <td style="text-align:center">${p.saudara||'0'}</td>
+      <td>${p.ayah||'-'}</td><td>${p.kerja_ayah||'-'}</td><td>${p.didik_ayah||'-'}</td>
+      <td>${p.ibu||'-'}</td><td>${p.kerja_ibu||'-'}</td><td>${p.didik_ibu||'-'}</td>
+      <td style="max-width:160px;white-space:normal">${p.alamat||'-'}</td>
+      <td>${p.kelurahan||'-'}</td><td>${p.kecamatan||'-'}</td><td>${p.kabupaten||'-'}</td><td>${p.provinsi||'-'}</td>
+      <td>${p.asal||'-'}</td><td>${p.asal_alamat||'-'}</td><td>${p.tgl_daftar||'-'}</td>
+      <td><button class="btn-hapus" onclick="hapus(${p.id})">🗑</button></td>
+    </tr>
+  `).join('');
+}
+
+// ===== STATS =====
+function updateStats() {
+  const today = new Date().toLocaleDateString('id-ID');
+  document.getElementById('stat-total').textContent = peserta.length;
+  document.getElementById('stat-lk').textContent = peserta.filter(p=>p.jk==='Laki-laki').length;
+  document.getElementById('stat-pr').textContent = peserta.filter(p=>p.jk==='Perempuan').length;
+  document.getElementById('stat-today').textContent = peserta.filter(p=>p.tgl_daftar===today).length;
+}
+
+// ===== EXPORT EXCEL =====
+function exportExcel() {
+  if (!peserta.length) { showToast('⚠️ Tidak ada data untuk diekspor', 'error'); return; }
+  const rows = peserta.map((p,i) => ({
+    'No': i+1, 'No. Pendaftaran': p.no_daftar||'',
+    'Nama Siswa': p.nama, 'Jenis Kelamin': p.jk, 'NIK': p.nik||'',
+    'Tempat Lahir': p.tempat_lahir||'',
+    'Tanggal Lahir': p.tanggal_lahir ? new Date(p.tanggal_lahir).toLocaleDateString('id-ID') : '',
+    'Agama': p.agama||'', 'Jumlah Saudara': p.saudara||'0',
+    'Nama Ayah': p.ayah||'', 'Pekerjaan Ayah': p.kerja_ayah||'-', 'Pendidikan Ayah': p.didik_ayah||'-',
+    'Nama Ibu': p.ibu||'', 'Pekerjaan Ibu': p.kerja_ibu||'-', 'Pendidikan Ibu': p.didik_ibu||'-',
+    'Alamat': p.alamat||'', 'Kelurahan/Desa': p.kelurahan||'',
+    'Kecamatan': p.kecamatan||'', 'Kab/Kota': p.kabupaten||'', 'Provinsi': p.provinsi||'',
+    'Nama Sekolah Asal': p.asal||'', 'Alamat Sekolah Asal': p.asal_alamat||'-',
+    'Tanggal Daftar': p.tgl_daftar||''
+  }));
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = Object.keys(rows[0]).map(() => ({wch:18}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Data PPDB');
+
+  const rekapData = [
+    ['REKAP PENDAFTARAN PESERTA DIDIK BARU'],
+    ['Tanggal Cetak', new Date().toLocaleDateString('id-ID')],
+    [], ['Keterangan', 'Jumlah'],
+    ['Total Pendaftar', peserta.length],
+    ['Laki-laki', peserta.filter(p=>p.jk==='Laki-laki').length],
+    ['Perempuan', peserta.filter(p=>p.jk==='Perempuan').length],
+    [], ['Berdasarkan Agama', ''],
+    ...['Islam','Kristen Protestan','Kristen Katolik','Hindu','Budha','Konghucu']
+      .map(ag => [ag, peserta.filter(p=>p.agama===ag).length])
+  ];
+  const wsRekap = XLSX.utils.aoa_to_sheet(rekapData);
+  wsRekap['!cols'] = [{wch:24},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsRekap, 'Rekap');
+
+  XLSX.writeFile(wb, `PPDB_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('📥 File Excel berhasil diunduh!', 'success');
+}
+
+// ===== LOADING & TOAST =====
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg||'Memproses...';
+  document.getElementById('loading-overlay').style.display='flex';
+}
+function hideLoading() { document.getElementById('loading-overlay').style.display='none'; }
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + type;
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.className='', 3500);
+}
+</script>
+</body>
+</html>
