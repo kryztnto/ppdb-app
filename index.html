@@ -157,10 +157,12 @@
     <div class="form-group">
       <label>Password</label>
       <input type="password" id="login-pass" placeholder="Masukkan password" onkeydown="if(event.key==='Enter')doLogin()" />
-      <button class="btn-primary" onclick="doLogin()">Masuk →</button>
     </div>
+    <button class="btn-primary" onclick="doLogin()">Masuk →</button>
+    <div class="login-hint">Demo: username <span>admin</span> / password <span>admin123</span></div>
+  </div>
 </div>
-
+  
 <!-- APP -->
 <div id="app" style="display:none;flex-direction:column;">
   <div class="topbar">
